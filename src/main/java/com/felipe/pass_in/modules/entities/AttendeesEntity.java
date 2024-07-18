@@ -26,7 +26,7 @@ public class AttendeesEntity {
     private String email;
 
     @ManyToOne
-    @JoinColumn(name = "events_id", nullable = false)
+    @JoinColumn(name = "event_id", nullable = false)
     private EventsEntity event;
 
     @Column(name = "created_at")

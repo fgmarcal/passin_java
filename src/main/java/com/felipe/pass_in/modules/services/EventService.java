@@ -1,16 +1,20 @@
 package com.felipe.pass_in.modules.services;
 
+import com.felipe.pass_in.modules.dto.attendee.AttendeeIdDTO;
+import com.felipe.pass_in.modules.dto.attendee.AttendeeRequestDTO;
 import com.felipe.pass_in.modules.dto.event.EventIdDTO;
 import com.felipe.pass_in.modules.dto.event.EventRequestDTO;
 import com.felipe.pass_in.modules.dto.event.EventResponseDTO;
 import com.felipe.pass_in.modules.entities.AttendeesEntity;
 import com.felipe.pass_in.modules.entities.EventsEntity;
+import com.felipe.pass_in.modules.exceptions.events.EventIsFullException;
 import com.felipe.pass_in.modules.exceptions.events.EventNotFoundException;
 import com.felipe.pass_in.modules.repositories.EventRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.text.Normalizer;
+import java.time.LocalDateTime;
 import java.util.List;
 
 @Service
@@ -23,12 +27,15 @@ public class EventService {
     private AttendeeService attendeeService;
 
     public EventResponseDTO getEventDetail(String eventId){
-        EventsEntity event = this.eventRepository.findById(eventId)
-                .orElseThrow(()-> new EventNotFoundException(("Event not found with ID: " + eventId)));
-
+        var event = getEventById(eventId);
         List<AttendeesEntity> attendeeList = this.attendeeService.getAllAttendeesFromEvent(eventId);
 
         return new EventResponseDTO(event, attendeeList.size());
+    }
+
+    public List<EventsEntity> getAllEvents(){
+        var events = this.eventRepository.findAll();
+        return events;
     }
 
     public EventIdDTO createEvent(EventRequestDTO event){
@@ -50,6 +57,30 @@ public class EventService {
                 .replaceAll("[^\\w\\s]", "")
                 .replaceAll("\\s+","-")
                 .toLowerCase();
+    }
+
+    private EventsEntity getEventById(String eventId){
+        return this.eventRepository.findById(eventId)
+                .orElseThrow(()-> new EventNotFoundException(("Event not found with ID: " + eventId)));
+    }
+
+    public AttendeeIdDTO registerAttendeeOnEvent(String eventId, AttendeeRequestDTO attendeeRequestDTO){
+        this.attendeeService.verifyAttendeeSubscription(attendeeRequestDTO.email(),eventId);
+
+        var event = getEventById(eventId);
+        List<AttendeesEntity> attendeeList = this.attendeeService.getAllAttendeesFromEvent(eventId);
+
+        if(event.getMaximumAttendees() <= attendeeList.size()){
+            throw new EventIsFullException("Event is full");
+        }
+        AttendeesEntity newAttendee = new AttendeesEntity();
+        newAttendee.setName(attendeeRequestDTO.name());
+        newAttendee.setEmail(attendeeRequestDTO.email());
+        newAttendee.setEvent(event);
+        newAttendee.setCreatedAt(LocalDateTime.now());
+
+        this.attendeeService.registerAttendee(newAttendee);
+        return new AttendeeIdDTO(newAttendee.getId());
     }
 
 }
